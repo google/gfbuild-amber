@@ -138,7 +138,8 @@ case "$(uname)" in
   ;;
 
 "MINGW"*)
-  cp "${BUILD_DIR}/amber.exe" "${BUILD_DIR}/amber.pdb" "${INSTALL_DIR}/bin/"
+  cp "${BUILD_DIR}/amber.exe" "${INSTALL_DIR}/bin/"
+  cp "${BUILD_DIR}/amber.pdb" "${INSTALL_DIR}/bin/" || true
   ;;
 
 *)
