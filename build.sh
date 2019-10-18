@@ -116,21 +116,48 @@ BUILD_DIR="b_${CONFIG}"
 mkdir -p "${BUILD_DIR}"
 pushd "${BUILD_DIR}"
 
-cmake -G "${CMAKE_GENERATOR}" .. "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}" "${CMAKE_OPTIONS[@]}"
-cmake --build . --config "${CMAKE_BUILD_TYPE}"
-# Skip install step since Amber does not add install targets.
-#cmake "-DCMAKE_INSTALL_PREFIX=../${INSTALL_DIR}" "-DBUILD_TYPE=${CMAKE_BUILD_TYPE}" -P cmake_install.cmake
-popd
+# TODO: Remove.
+touch amber
+#cmake -G "${CMAKE_GENERATOR}" .. "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}" "${CMAKE_OPTIONS[@]}"
+#cmake --build . --config "${CMAKE_BUILD_TYPE}"
+## Skip install step since Amber does not add install targets.
+##cmake "-DCMAKE_INSTALL_PREFIX=../${INSTALL_DIR}" "-DBUILD_TYPE=${CMAKE_BUILD_TYPE}" -P cmake_install.cmake
+#popd
 
 # Do Android build when on Linux Debug.
 case "$(uname)" in
 "Linux")
   if test "${CONFIG}" = "Debug"; then
+
+    # Download NDK.
+
+    pushd "${HOME}"
+    ANDROID_HOST_PLATFORM="linux"
+    echo "Installing Android NDK ${ANDROID_HOST_PLATFORM} (linux, darwin, or windows) ..."
+
+    ANDROID_NDK_FILENAME="android-ndk-r20-${ANDROID_HOST_PLATFORM}-x86_64.zip"
+
+    ANDROID_NDK_HOME="$(pwd)/android-ndk-r20"
+    export ANDROID_NDK_HOME
+
+    echo "... to ${ANDROID_NDK_HOME}"
+
+    if test ! -d "${ANDROID_NDK_HOME}"; then
+      # Android "android-ndk.zip" "ndk-bundle"
+      curl -sSo "${ANDROID_NDK_FILENAME}" "https://dl.google.com/android/repository/${ANDROID_NDK_FILENAME}"
+      unzip -q "${ANDROID_NDK_FILENAME}"
+      rm "${ANDROID_NDK_FILENAME}"
+      test -d "${ANDROID_NDK_HOME}"
+    fi
+
+    popd
+
     "${PYTHON}" tools/update_build_version.py . samples/ third_party/
     "${PYTHON}" tools/update_vk_wrappers.py . .
     mkdir -p "${AMBER_NDK_INSTALL_DIR}"
     pushd "${AMBER_NDK_INSTALL_DIR}"
-    "${ANDROID_NDK_HOME}/ndk-build" -C ../samples NDK_PROJECT_PATH=. "NDK_LIBS_OUT=$(pwd)/libs" "NDK_APP_OUT=$(pwd)/app"
+    # Build all ABIs.
+    "${ANDROID_NDK_HOME}/ndk-build" -C ../samples NDK_PROJECT_PATH=. "NDK_LIBS_OUT=$(pwd)/libs" "NDK_APP_OUT=$(pwd)/app" -j2 APP_ABI="arm64-v8a armeabi-v7a x86 x86_64"
     popd
   fi
   ;;
