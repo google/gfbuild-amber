@@ -109,7 +109,7 @@ git checkout "${COMMIT_ID}"
 
 pushd third_party
 # Do a shallow clone of SwiftShader so that git-sync-deps does not try to do a deep clone (which takes a long time).
-git clone --shallow-since=2019-05-01 https://swiftshader.googlesource.com/SwiftShader.git swiftshader
+git clone --shallow-since=2019-05-01 https://github.com/google/swiftshader.git swiftshader
 popd
 
 "${PYTHON}" tools/git-sync-deps
