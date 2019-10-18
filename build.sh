@@ -75,6 +75,7 @@ BUILD_REPO_SHA="${GITHUB_SHA}"
 CLASSIFIER="${BUILD_PLATFORM}_${CONFIG}"
 POM_FILE="${BUILD_REPO_NAME}-${ARTIFACT_VERSION}.pom"
 INSTALL_DIR="${ARTIFACT}-${ARTIFACT_VERSION}-${CLASSIFIER}"
+AMBER_NDK_INSTALL_DIR="${ARTIFACT}-${ARTIFACT_VERSION}-android_ndk"
 
 GH_RELEASE_TOOL_USER="c4milo"
 GH_RELEASE_TOOL_VERSION="v1.1.0"
@@ -120,6 +121,25 @@ cmake --build . --config "${CMAKE_BUILD_TYPE}"
 # Skip install step since Amber does not add install targets.
 #cmake "-DCMAKE_INSTALL_PREFIX=../${INSTALL_DIR}" "-DBUILD_TYPE=${CMAKE_BUILD_TYPE}" -P cmake_install.cmake
 popd
+
+# Do Android build when on Linux Debug.
+case "$(uname)" in
+"Linux")
+  if test "${CONFIG}" = "Debug"; then
+    "${PYTHON}" tools/update_build_version.py . samples/ third_party/
+    "${PYTHON}" tools/update_vk_wrappers.py . .
+    mkdir -p "${AMBER_NDK_INSTALL_DIR}"
+    pushd "${AMBER_NDK_INSTALL_DIR}"
+    "${ANDROID_NDK_HOME}/ndk-build" -C ../samples NDK_PROJECT_PATH=. "NDK_LIBS_OUT=$(pwd)/libs" "NDK_APP_OUT=$(pwd)/app"
+    popd
+  fi
+  ;;
+
+*)
+  echo "Skipping Android build."
+  ;;
+esac
+
 ###### END BUILD ######
 
 ###### START EDIT ######
@@ -152,6 +172,27 @@ for f in "${INSTALL_DIR}/bin/"*; do
   echo "${BUILD_REPO_SHA}">"${f}.build-version"
   cp "${WORK}/COMMIT_ID" "${f}.version"
 done
+
+# Do the Android "install" step when on Linux Debug.
+case "$(uname)" in
+"Linux")
+  if test "${CONFIG}" = "Debug"; then
+    # We just want the libs directory.
+    # amber-1827383-android_ndk/app/local/{arm64-v8a, ...}/...
+    # amber-1827383-android_ndk/libs/{arm64-v8a, ...}/amber_ndk
+    rm -rf "${AMBER_NDK_INSTALL_DIR}/app"
+    for f in "${AMBER_NDK_INSTALL_DIR}/libs/"*/*; do
+      echo "${BUILD_REPO_SHA}">"${f}.build-version"
+      cp "${WORK}/COMMIT_ID" "${f}.version"
+    done
+  fi
+  ;;
+
+*)
+  echo "Skipping Android install step."
+  ;;
+esac
+
 ###### END EDIT ######
 
 GRAPHICSFUZZ_COMMIT_SHA="b82cf495af1dea454218a332b88d2d309657594d"
@@ -174,6 +215,27 @@ sed -e "s/@GROUP@/${GROUP_DOTS}/g" -e "s/@ARTIFACT@/${ARTIFACT}/g" -e "s/@VERSIO
 sha1sum "${POM_FILE}" >"${POM_FILE}.sha1"
 
 DESCRIPTION="$(echo -e "Automated build for ${TARGET_REPO_NAME} version ${COMMIT_ID}.\n$(git log --graph -n 3 --abbrev-commit --pretty='format:%h - %s <%an>')")"
+
+
+# Do the Android zip step when on Linux Debug.
+case "$(uname)" in
+"Linux")
+  if test "${CONFIG}" = "Debug"; then
+    cp OPEN_SOURCE_LICENSES.TXT "${AMBER_NDK_INSTALL_DIR}/"
+
+    pushd "${AMBER_NDK_INSTALL_DIR}"
+    zip -r "../${AMBER_NDK_INSTALL_DIR}.zip" ./*
+    popd
+
+    sha1sum "${AMBER_NDK_INSTALL_DIR}.zip" >"${AMBER_NDK_INSTALL_DIR}.zip.sha1"
+
+  fi
+  ;;
+
+*)
+  echo "Skipping Android zip step."
+  ;;
+esac
 
 # Only release from master branch commits.
 # shellcheck disable=SC2153
@@ -199,6 +261,32 @@ github-release \
   "${BUILD_REPO_SHA}" \
   "${DESCRIPTION}" \
   "${INSTALL_DIR}.zip.sha1"
+
+# Do the Android release step when on Linux Debug.
+case "$(uname)" in
+"Linux")
+  if test "${CONFIG}" = "Debug"; then
+    github-release \
+      "${BUILD_REPO_ORG}/${BUILD_REPO_NAME}" \
+      "${TAG}" \
+      "${BUILD_REPO_SHA}" \
+      "${DESCRIPTION}" \
+      "${AMBER_NDK_INSTALL_DIR}.zip"
+
+    github-release \
+      "${BUILD_REPO_ORG}/${BUILD_REPO_NAME}" \
+      "${TAG}" \
+      "${BUILD_REPO_SHA}" \
+      "${DESCRIPTION}" \
+      "${AMBER_NDK_INSTALL_DIR}.zip.sha1"
+  fi
+  ;;
+
+*)
+  echo "Skipping Android release step."
+  ;;
+esac
+
 
 # Don't fail if pom cannot be uploaded, as it might already be there.
 
