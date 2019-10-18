@@ -107,6 +107,11 @@ git clone https://github.com/${TARGET_REPO_ORG}/${TARGET_REPO_NAME}.git "${TARGE
 cd "${TARGET_REPO_NAME}"
 git checkout "${COMMIT_ID}"
 
+pushd third_party
+# Do a shallow clone of SwiftShader so that git-sync-deps does not try to do a deep clone (which takes a long time).
+git clone --shallow-since=2019-05-01 https://swiftshader.googlesource.com/SwiftShader.git swiftshader
+popd
+
 "${PYTHON}" tools/git-sync-deps
 ###### END EDIT ######
 
@@ -122,7 +127,7 @@ touch amber
 #cmake --build . --config "${CMAKE_BUILD_TYPE}"
 ## Skip install step since Amber does not add install targets.
 ##cmake "-DCMAKE_INSTALL_PREFIX=../${INSTALL_DIR}" "-DBUILD_TYPE=${CMAKE_BUILD_TYPE}" -P cmake_install.cmake
-#popd
+popd
 
 # Do Android build when on Linux Debug.
 case "$(uname)" in
