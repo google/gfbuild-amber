@@ -124,7 +124,7 @@ popd
 
 ###### START EDIT ######
 
-# Amber has no install targets.
+# Amber has no install targets, so manually copy amber binary.
 
 mkdir -p "${INSTALL_DIR}/bin"
 
