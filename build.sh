@@ -77,6 +77,8 @@ POM_FILE="${BUILD_REPO_NAME}-${ARTIFACT_VERSION}.pom"
 INSTALL_DIR="${ARTIFACT}-${ARTIFACT_VERSION}-${CLASSIFIER}"
 AMBER_NDK_INSTALL_DIR="${ARTIFACT}-${ARTIFACT_VERSION}-android_ndk"
 AMBER_APK_INSTALL_DIR="${ARTIFACT}-${ARTIFACT_VERSION}-android_apk"
+AMBER_APK="amber.apk"
+AMBER_TEST_APK="amber-test.apk"
 
 GH_RELEASE_TOOL_USER="c4milo"
 GH_RELEASE_TOOL_VERSION="v1.1.0"
@@ -169,7 +171,7 @@ case "$(uname)" in
         # Android "platforms" and "build-tools"
         echo y | tools/bin/sdkmanager \
           "platforms;android-29" \
-          "build-tools;29.0.2"
+          "build-tools;29.0.2" | grep -v '%'
         touch "android-29-build-tools-29.0.2.touch"
       fi
     popd
@@ -205,10 +207,12 @@ case "$(uname)" in
 #      "${ANDROID_NDK_HOME}/ndk-build" -C ../samples NDK_PROJECT_PATH=. "NDK_LIBS_OUT=$(pwd)/libs" "NDK_APP_OUT=$(pwd)/app" -j2 APP_ABI="arm64-v8a armeabi-v7a x86 x86_64"
 #    popd
 
+    mkdir -p "${AMBER_APK_INSTALL_DIR}"
     pushd "android_gradle"
-      ./gradlew android:assembleDebug
+      ./gradlew assembleDebug assembleDebugAndroidTest
     popd
-
+    cp "android_gradle/app/build/outputs/apk/debug/app-debug.apk" "${AMBER_APK_INSTALL_DIR}/${AMBER_APK}"
+    cp "android_gradle/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk" "${AMBER_APK_INSTALL_DIR}/${AMBER_TEST_APK}"
   fi
   ;;
 
@@ -262,6 +266,11 @@ case "$(uname)" in
       echo "${BUILD_REPO_SHA}">"${f}.build-version"
       cp "${WORK}/COMMIT_ID" "${f}.version"
     done
+
+    for f in "${AMBER_APK_INSTALL_DIR}/"*.apk; do
+      echo "${BUILD_REPO_SHA}">"${f}.build-version"
+      cp "${WORK}/COMMIT_ID" "${f}.version"
+    done
   fi
   ;;
 
@@ -305,6 +314,14 @@ case "$(uname)" in
     popd
 
     sha1sum "${AMBER_NDK_INSTALL_DIR}.zip" >"${AMBER_NDK_INSTALL_DIR}.zip.sha1"
+
+    cp OPEN_SOURCE_LICENSES.TXT "${AMBER_APK_INSTALL_DIR}/"
+
+    pushd "${AMBER_APK_INSTALL_DIR}"
+    zip -r "../${AMBER_APK_INSTALL_DIR}.zip" ./*
+    popd
+
+    sha1sum "${AMBER_APK_INSTALL_DIR}.zip" >"${AMBER_APK_INSTALL_DIR}.zip.sha1"
 
   fi
   ;;
@@ -356,6 +373,20 @@ case "$(uname)" in
       "${BUILD_REPO_SHA}" \
       "${DESCRIPTION}" \
       "${AMBER_NDK_INSTALL_DIR}.zip.sha1"
+
+    github-release \
+      "${BUILD_REPO_ORG}/${BUILD_REPO_NAME}" \
+      "${TAG}" \
+      "${BUILD_REPO_SHA}" \
+      "${DESCRIPTION}" \
+      "${AMBER_APK_INSTALL_DIR}.zip"
+
+    github-release \
+      "${BUILD_REPO_ORG}/${BUILD_REPO_NAME}" \
+      "${TAG}" \
+      "${BUILD_REPO_SHA}" \
+      "${DESCRIPTION}" \
+      "${AMBER_APK_INSTALL_DIR}.zip.sha1"
   fi
   ;;
 
