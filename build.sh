@@ -76,6 +76,7 @@ CLASSIFIER="${BUILD_PLATFORM}_${CONFIG}"
 POM_FILE="${BUILD_REPO_NAME}-${ARTIFACT_VERSION}.pom"
 INSTALL_DIR="${ARTIFACT}-${ARTIFACT_VERSION}-${CLASSIFIER}"
 AMBER_NDK_INSTALL_DIR="${ARTIFACT}-${ARTIFACT_VERSION}-android_ndk"
+AMBER_APK_INSTALL_DIR="${ARTIFACT}-${ARTIFACT_VERSION}-android_apk"
 
 GH_RELEASE_TOOL_USER="c4milo"
 GH_RELEASE_TOOL_VERSION="v1.1.0"
@@ -116,8 +117,9 @@ BUILD_DIR="b_${CONFIG}"
 mkdir -p "${BUILD_DIR}"
 pushd "${BUILD_DIR}"
 
-cmake -G "${CMAKE_GENERATOR}" .. "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}" "${CMAKE_OPTIONS[@]}"
-cmake --build . --config "${CMAKE_BUILD_TYPE}"
+# TODO: revert
+#cmake -G "${CMAKE_GENERATOR}" .. "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}" "${CMAKE_OPTIONS[@]}"
+#cmake --build . --config "${CMAKE_BUILD_TYPE}"
 # Skip install step since Amber does not add install targets.
 #cmake "-DCMAKE_INSTALL_PREFIX=../${INSTALL_DIR}" "-DBUILD_TYPE=${CMAKE_BUILD_TYPE}" -P cmake_install.cmake
 popd
@@ -127,36 +129,86 @@ case "$(uname)" in
 "Linux")
   if test "${CONFIG}" = "Debug"; then
 
+    ANDROID_HOST_PLATFORM="linux"
+
+    # Download SDK.
+
+    pushd "${HOME}"
+      mkdir android-sdk-linux
+      cd android-sdk-linux
+
+      ANDROID_HOME="$(pwd)"
+      export ANDROID_HOME
+
+      echo "Installing Android SDK ${ANDROID_HOST_PLATFORM} (linux, darwin, or windows) to ${ANDROID_HOME}"
+
+      ANDROID_TOOLS_FILENAME="sdk-tools-${ANDROID_HOST_PLATFORM}-4333796.zip"
+      ANDROID_PLATFORM_TOOLS_FILENAME="platform-tools_r29.0.5-${ANDROID_HOST_PLATFORM}.zip"
+
+      if test ! -f "${ANDROID_TOOLS_FILENAME}.touch"; then
+        # Android: "sdk-tools.zip" "tools":
+        rm -rf tools
+        curl -sSo "${ANDROID_TOOLS_FILENAME}" "http://dl.google.com/android/repository/${ANDROID_TOOLS_FILENAME}"
+        unzip -q "${ANDROID_TOOLS_FILENAME}"
+        rm "${ANDROID_TOOLS_FILENAME}"
+        test -d tools
+        touch "${ANDROID_TOOLS_FILENAME}.touch"
+      fi
+
+      if test ! -f "${ANDROID_PLATFORM_TOOLS_FILENAME}.touch"; then
+        # Android "platform-tools.zip" "platform-tools"
+        rm -rf platform-tools
+        curl -sSo "${ANDROID_PLATFORM_TOOLS_FILENAME}" "https://dl.google.com/android/repository/${ANDROID_PLATFORM_TOOLS_FILENAME}"
+        unzip -q "${ANDROID_PLATFORM_TOOLS_FILENAME}"
+        rm "${ANDROID_PLATFORM_TOOLS_FILENAME}"
+        test -d platform-tools
+        touch "${ANDROID_PLATFORM_TOOLS_FILENAME}.touch"
+      fi
+
+      if test ! -f "android-29-build-tools-29.0.2.touch"; then
+        # Android "platforms" and "build-tools"
+        echo y | tools/bin/sdkmanager \
+          "platforms;android-29" \
+          "build-tools;29.0.2"
+        touch "android-29-build-tools-29.0.2.touch"
+      fi
+    popd
+
     # Download NDK.
 
     pushd "${HOME}"
-    ANDROID_HOST_PLATFORM="linux"
-    echo "Installing Android NDK ${ANDROID_HOST_PLATFORM} (linux, darwin, or windows) ..."
+      echo "Installing Android NDK ${ANDROID_HOST_PLATFORM} (linux, darwin, or windows) ..."
 
-    ANDROID_NDK_FILENAME="android-ndk-r20-${ANDROID_HOST_PLATFORM}-x86_64.zip"
+      ANDROID_NDK_FILENAME="android-ndk-r20-${ANDROID_HOST_PLATFORM}-x86_64.zip"
 
-    ANDROID_NDK_HOME="$(pwd)/android-ndk-r20"
-    export ANDROID_NDK_HOME
+      ANDROID_NDK_HOME="$(pwd)/android-ndk-r20"
+      export ANDROID_NDK_HOME
 
-    echo "... to ${ANDROID_NDK_HOME}"
+      echo "... to ${ANDROID_NDK_HOME}"
 
-    if test ! -d "${ANDROID_NDK_HOME}"; then
-      # Android "android-ndk.zip" "ndk-bundle"
-      curl -sSo "${ANDROID_NDK_FILENAME}" "https://dl.google.com/android/repository/${ANDROID_NDK_FILENAME}"
-      unzip -q "${ANDROID_NDK_FILENAME}"
-      rm "${ANDROID_NDK_FILENAME}"
-      test -d "${ANDROID_NDK_HOME}"
-    fi
-
+      if test ! -d "${ANDROID_NDK_HOME}"; then
+        # Android "android-ndk.zip" "ndk-bundle"
+        curl -sSo "${ANDROID_NDK_FILENAME}" "https://dl.google.com/android/repository/${ANDROID_NDK_FILENAME}"
+        unzip -q "${ANDROID_NDK_FILENAME}"
+        rm "${ANDROID_NDK_FILENAME}"
+        test -d "${ANDROID_NDK_HOME}"
+      fi
     popd
 
     "${PYTHON}" tools/update_build_version.py . samples/ third_party/
     "${PYTHON}" tools/update_vk_wrappers.py . .
     mkdir -p "${AMBER_NDK_INSTALL_DIR}"
-    pushd "${AMBER_NDK_INSTALL_DIR}"
-    # Build all ABIs.
-    "${ANDROID_NDK_HOME}/ndk-build" -C ../samples NDK_PROJECT_PATH=. "NDK_LIBS_OUT=$(pwd)/libs" "NDK_APP_OUT=$(pwd)/app" -j2 APP_ABI="arm64-v8a armeabi-v7a x86 x86_64"
+
+# TODO: revert
+#    pushd "${AMBER_NDK_INSTALL_DIR}"
+#      # Build all ABIs.
+#      "${ANDROID_NDK_HOME}/ndk-build" -C ../samples NDK_PROJECT_PATH=. "NDK_LIBS_OUT=$(pwd)/libs" "NDK_APP_OUT=$(pwd)/app" -j2 APP_ABI="arm64-v8a armeabi-v7a x86 x86_64"
+#    popd
+
+    pushd "android_gradle"
+      ./gradlew android:assembleDebug
     popd
+
   fi
   ;;
 
