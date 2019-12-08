@@ -26,7 +26,7 @@ TARGET_REPO_NAME="amber"
 BUILD_REPO_ORG="google"
 BUILD_REPO_NAME="gfbuild-amber"
 
-EXPECTED_NUM_ASSETS="17"
+EXPECTED_NUM_ASSETS="19"
 ###### END EDIT ######
 
 git checkout master
