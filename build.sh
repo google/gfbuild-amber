@@ -202,7 +202,7 @@ case "$(uname)" in
 
     pushd "${AMBER_NDK_INSTALL_DIR}"
       # Build all ABIs.
-      "${ANDROID_NDK_HOME}/ndk-build" -C ../samples NDK_PROJECT_PATH=. "NDK_LIBS_OUT=$(pwd)/libs" "NDK_APP_OUT=$(pwd)/app" -j2 APP_ABI="arm64-v8a"
+      "${ANDROID_NDK_HOME}/ndk-build" -C ../samples NDK_PROJECT_PATH=. "NDK_LIBS_OUT=$(pwd)/libs" "NDK_APP_OUT=$(pwd)/app" -j2 APP_ABI="arm64-v8a armeabi-v7a x86 x86_64"
     popd
 
     rm -rf "android_gradle/app/jniLibs"
