@@ -76,6 +76,9 @@ CLASSIFIER="${BUILD_PLATFORM}_${CONFIG}"
 POM_FILE="${BUILD_REPO_NAME}-${ARTIFACT_VERSION}.pom"
 INSTALL_DIR="${ARTIFACT}-${ARTIFACT_VERSION}-${CLASSIFIER}"
 AMBER_NDK_INSTALL_DIR="${ARTIFACT}-${ARTIFACT_VERSION}-android_ndk"
+AMBER_APK_INSTALL_DIR="${ARTIFACT}-${ARTIFACT_VERSION}-android_apk"
+AMBER_APK="amber.apk"
+AMBER_TEST_APK="amber-test.apk"
 
 GH_RELEASE_TOOL_USER="c4milo"
 GH_RELEASE_TOOL_VERSION="v1.1.0"
@@ -127,36 +130,90 @@ case "$(uname)" in
 "Linux")
   if test "${CONFIG}" = "Debug"; then
 
+    ANDROID_HOST_PLATFORM="linux"
+
+    # Download SDK.
+
+    pushd "${HOME}"
+      mkdir android-sdk-linux
+      cd android-sdk-linux
+
+      ANDROID_HOME="$(pwd)"
+      export ANDROID_HOME
+
+      echo "Installing Android SDK ${ANDROID_HOST_PLATFORM} (linux, darwin, or windows) to ${ANDROID_HOME}"
+
+      ANDROID_TOOLS_FILENAME="sdk-tools-${ANDROID_HOST_PLATFORM}-4333796.zip"
+      ANDROID_PLATFORM_TOOLS_FILENAME="platform-tools_r29.0.5-${ANDROID_HOST_PLATFORM}.zip"
+
+      if test ! -f "${ANDROID_TOOLS_FILENAME}.touch"; then
+        # Android: "sdk-tools.zip" "tools":
+        rm -rf tools
+        curl -sSo "${ANDROID_TOOLS_FILENAME}" "http://dl.google.com/android/repository/${ANDROID_TOOLS_FILENAME}"
+        unzip -q "${ANDROID_TOOLS_FILENAME}"
+        rm "${ANDROID_TOOLS_FILENAME}"
+        test -d tools
+        touch "${ANDROID_TOOLS_FILENAME}.touch"
+      fi
+
+      if test ! -f "${ANDROID_PLATFORM_TOOLS_FILENAME}.touch"; then
+        # Android "platform-tools.zip" "platform-tools"
+        rm -rf platform-tools
+        curl -sSo "${ANDROID_PLATFORM_TOOLS_FILENAME}" "https://dl.google.com/android/repository/${ANDROID_PLATFORM_TOOLS_FILENAME}"
+        unzip -q "${ANDROID_PLATFORM_TOOLS_FILENAME}"
+        rm "${ANDROID_PLATFORM_TOOLS_FILENAME}"
+        test -d platform-tools
+        touch "${ANDROID_PLATFORM_TOOLS_FILENAME}.touch"
+      fi
+
+      if test ! -f "android-29-build-tools-29.0.2.touch"; then
+        # Android "platforms" and "build-tools"
+        echo y | tools/bin/sdkmanager \
+          "platforms;android-29" \
+          "build-tools;29.0.2" | grep -v '%'
+        touch "android-29-build-tools-29.0.2.touch"
+      fi
+    popd
+
     # Download NDK.
 
     pushd "${HOME}"
-    ANDROID_HOST_PLATFORM="linux"
-    echo "Installing Android NDK ${ANDROID_HOST_PLATFORM} (linux, darwin, or windows) ..."
+      echo "Installing Android NDK ${ANDROID_HOST_PLATFORM} (linux, darwin, or windows) ..."
 
-    ANDROID_NDK_FILENAME="android-ndk-r20-${ANDROID_HOST_PLATFORM}-x86_64.zip"
+      ANDROID_NDK_FILENAME="android-ndk-r20-${ANDROID_HOST_PLATFORM}-x86_64.zip"
 
-    ANDROID_NDK_HOME="$(pwd)/android-ndk-r20"
-    export ANDROID_NDK_HOME
+      ANDROID_NDK_HOME="$(pwd)/android-ndk-r20"
+      export ANDROID_NDK_HOME
 
-    echo "... to ${ANDROID_NDK_HOME}"
+      echo "... to ${ANDROID_NDK_HOME}"
 
-    if test ! -d "${ANDROID_NDK_HOME}"; then
-      # Android "android-ndk.zip" "ndk-bundle"
-      curl -sSo "${ANDROID_NDK_FILENAME}" "https://dl.google.com/android/repository/${ANDROID_NDK_FILENAME}"
-      unzip -q "${ANDROID_NDK_FILENAME}"
-      rm "${ANDROID_NDK_FILENAME}"
-      test -d "${ANDROID_NDK_HOME}"
-    fi
-
+      if test ! -d "${ANDROID_NDK_HOME}"; then
+        # Android "android-ndk.zip" "ndk-bundle"
+        curl -sSo "${ANDROID_NDK_FILENAME}" "https://dl.google.com/android/repository/${ANDROID_NDK_FILENAME}"
+        unzip -q "${ANDROID_NDK_FILENAME}"
+        rm "${ANDROID_NDK_FILENAME}"
+        test -d "${ANDROID_NDK_HOME}"
+      fi
     popd
 
     "${PYTHON}" tools/update_build_version.py . samples/ third_party/
     "${PYTHON}" tools/update_vk_wrappers.py . .
     mkdir -p "${AMBER_NDK_INSTALL_DIR}"
+
     pushd "${AMBER_NDK_INSTALL_DIR}"
-    # Build all ABIs.
-    "${ANDROID_NDK_HOME}/ndk-build" -C ../samples NDK_PROJECT_PATH=. "NDK_LIBS_OUT=$(pwd)/libs" "NDK_APP_OUT=$(pwd)/app" -j2 APP_ABI="arm64-v8a armeabi-v7a x86 x86_64"
+      # Build all ABIs.
+      "${ANDROID_NDK_HOME}/ndk-build" -C ../samples NDK_PROJECT_PATH=. "NDK_LIBS_OUT=$(pwd)/libs" "NDK_APP_OUT=$(pwd)/app" -j2 APP_ABI="arm64-v8a armeabi-v7a x86 x86_64"
     popd
+
+    rm -rf "android_gradle/app/jniLibs"
+    ln -s "$(pwd)/${AMBER_NDK_INSTALL_DIR}/libs" "android_gradle/app/jniLibs"
+
+    mkdir -p "${AMBER_APK_INSTALL_DIR}"
+    pushd "android_gradle"
+      ./gradlew assembleDebug assembleDebugAndroidTest
+    popd
+    cp "android_gradle/app/build/outputs/apk/debug/app-debug.apk" "${AMBER_APK_INSTALL_DIR}/${AMBER_APK}"
+    cp "android_gradle/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk" "${AMBER_APK_INSTALL_DIR}/${AMBER_TEST_APK}"
   fi
   ;;
 
@@ -210,6 +267,11 @@ case "$(uname)" in
       echo "${BUILD_REPO_SHA}">"${f}.build-version"
       cp "${WORK}/COMMIT_ID" "${f}.version"
     done
+
+    for f in "${AMBER_APK_INSTALL_DIR}/"*.apk; do
+      echo "${BUILD_REPO_SHA}">"${f}.build-version"
+      cp "${WORK}/COMMIT_ID" "${f}.version"
+    done
   fi
   ;;
 
@@ -253,6 +315,14 @@ case "$(uname)" in
     popd
 
     sha1sum "${AMBER_NDK_INSTALL_DIR}.zip" >"${AMBER_NDK_INSTALL_DIR}.zip.sha1"
+
+    cp OPEN_SOURCE_LICENSES.TXT "${AMBER_APK_INSTALL_DIR}/"
+
+    pushd "${AMBER_APK_INSTALL_DIR}"
+    zip -r "../${AMBER_APK_INSTALL_DIR}.zip" ./*
+    popd
+
+    sha1sum "${AMBER_APK_INSTALL_DIR}.zip" >"${AMBER_APK_INSTALL_DIR}.zip.sha1"
 
   fi
   ;;
@@ -304,6 +374,20 @@ case "$(uname)" in
       "${BUILD_REPO_SHA}" \
       "${DESCRIPTION}" \
       "${AMBER_NDK_INSTALL_DIR}.zip.sha1"
+
+    github-release \
+      "${BUILD_REPO_ORG}/${BUILD_REPO_NAME}" \
+      "${TAG}" \
+      "${BUILD_REPO_SHA}" \
+      "${DESCRIPTION}" \
+      "${AMBER_APK_INSTALL_DIR}.zip"
+
+    github-release \
+      "${BUILD_REPO_ORG}/${BUILD_REPO_NAME}" \
+      "${TAG}" \
+      "${BUILD_REPO_SHA}" \
+      "${DESCRIPTION}" \
+      "${AMBER_APK_INSTALL_DIR}.zip.sha1"
   fi
   ;;
 
