@@ -119,9 +119,8 @@ BUILD_DIR="b_${CONFIG}"
 mkdir -p "${BUILD_DIR}"
 pushd "${BUILD_DIR}"
 
-# TODO: revert
-#cmake -G "${CMAKE_GENERATOR}" .. "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}" "${CMAKE_OPTIONS[@]}"
-#cmake --build . --config "${CMAKE_BUILD_TYPE}"
+cmake -G "${CMAKE_GENERATOR}" .. "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}" "${CMAKE_OPTIONS[@]}"
+cmake --build . --config "${CMAKE_BUILD_TYPE}"
 # Skip install step since Amber does not add install targets.
 #cmake "-DCMAKE_INSTALL_PREFIX=../${INSTALL_DIR}" "-DBUILD_TYPE=${CMAKE_BUILD_TYPE}" -P cmake_install.cmake
 popd
@@ -201,11 +200,13 @@ case "$(uname)" in
     "${PYTHON}" tools/update_vk_wrappers.py . .
     mkdir -p "${AMBER_NDK_INSTALL_DIR}"
 
-# TODO: revert
-#    pushd "${AMBER_NDK_INSTALL_DIR}"
-#      # Build all ABIs.
-#      "${ANDROID_NDK_HOME}/ndk-build" -C ../samples NDK_PROJECT_PATH=. "NDK_LIBS_OUT=$(pwd)/libs" "NDK_APP_OUT=$(pwd)/app" -j2 APP_ABI="arm64-v8a armeabi-v7a x86 x86_64"
-#    popd
+    pushd "${AMBER_NDK_INSTALL_DIR}"
+      # Build all ABIs.
+      "${ANDROID_NDK_HOME}/ndk-build" -C ../samples NDK_PROJECT_PATH=. "NDK_LIBS_OUT=$(pwd)/libs" "NDK_APP_OUT=$(pwd)/app" -j2 APP_ABI="arm64-v8a"
+    popd
+
+    rm -rf "android_gradle/app/jniLibs"
+    ln -s "$(pwd)/${AMBER_NDK_INSTALL_DIR}/libs" "android_gradle/app/jniLibs"
 
     mkdir -p "${AMBER_APK_INSTALL_DIR}"
     pushd "android_gradle"
