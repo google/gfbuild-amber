@@ -250,7 +250,12 @@ case "$(uname)" in
   ;;
 esac
 
-for f in "${INSTALL_DIR}/bin/"*; do
+# Also, install the Vulkan loader; this allows Amber to be used on platforms that don't have a Vulkan loader/driver.
+pushd "${BUILD_DIR}/third_party/vulkan-loader"
+  cmake "-DCMAKE_INSTALL_PREFIX=${WORK}/${INSTALL_DIR}" "-DBUILD_TYPE=${CMAKE_BUILD_TYPE}" -P cmake_install.cmake
+popd
+
+for f in "${INSTALL_DIR}/bin/"* "${INSTALL_DIR}/lib/"*; do
   echo "${BUILD_REPO_SHA}">"${f}.build-version"
   cp "${WORK}/COMMIT_ID" "${f}.version"
 done
