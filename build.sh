@@ -226,22 +226,27 @@ esac
 
 ###### START EDIT ######
 
-# Amber has no install targets, so manually copy amber binary.
+# Amber has no install targets, so manually copy amber binary and the Vulkan loader.
 
 mkdir -p "${INSTALL_DIR}/bin"
+mkdir -p "${INSTALL_DIR}/lib"
 
 case "$(uname)" in
 "Linux")
   cp "${BUILD_DIR}/amber" "${INSTALL_DIR}/bin/"
+  cp "${BUILD_DIR}/third_party/vulkan-loader/loader/libvulkan."* "${INSTALL_DIR}/lib/"
   ;;
 
 "Darwin")
   cp "${BUILD_DIR}/amber" "${INSTALL_DIR}/bin/"
+  cp "${BUILD_DIR}/third_party/vulkan-loader/loader/libvulkan."* "${INSTALL_DIR}/lib/"
   ;;
 
 "MINGW"*)
   cp "${BUILD_DIR}/amber.exe" "${INSTALL_DIR}/bin/"
   cp "${BUILD_DIR}/amber.pdb" "${INSTALL_DIR}/bin/" || true
+  cp "${BUILD_DIR}/vulkan-1.dll" "${INSTALL_DIR}/lib/"
+  cp "${BUILD_DIR}/vulkan-1.pdb" "${INSTALL_DIR}/lib/" || true
   ;;
 
 *)
@@ -249,11 +254,6 @@ case "$(uname)" in
   exit 1
   ;;
 esac
-
-# Also, install the Vulkan loader; this allows Amber to be used on platforms that don't have a Vulkan loader/driver.
-pushd "${BUILD_DIR}/third_party/vulkan-loader"
-  cmake "-DCMAKE_INSTALL_PREFIX=../../../${INSTALL_DIR}" "-DBUILD_TYPE=${CMAKE_BUILD_TYPE}" -P cmake_install.cmake
-popd
 
 for f in "${INSTALL_DIR}/bin/"* "${INSTALL_DIR}/lib/"*; do
   echo "${BUILD_REPO_SHA}">"${f}.build-version"
