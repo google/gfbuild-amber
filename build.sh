@@ -244,7 +244,7 @@ case "$(uname)" in
   cp "${BUILD_DIR}/third_party/vulkan-loader/loader/libvulkan."* "${INSTALL_DIR}/lib/"
   ;;
 
-"MINGW"*)
+"MINGW"*|"MSYS_NT"*)
   cp "${BUILD_DIR}/amber.exe" "${INSTALL_DIR}/bin/"
   cp "${BUILD_DIR}/amber.pdb" "${INSTALL_DIR}/bin/" || true
   cp "${BUILD_DIR}/vulkan-1.dll" "${INSTALL_DIR}/lib/"
