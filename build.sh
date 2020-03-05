@@ -359,6 +359,50 @@ export GITHUB_TOKEN="${GH_TOKEN}"
   --body_string "${DESCRIPTION}" \
   "${INSTALL_DIR}.zip.sha1"
 
+# Do the Android release step when on Linux Debug.
+case "$(uname)" in
+"Linux")
+  if test "${CONFIG}" = "Debug"; then
+
+    "${PYTHON}" -m github_release_retry.github_release_retry \
+      --user "${BUILD_REPO_ORG}" \
+      --repo "${BUILD_REPO_NAME}" \
+      --tag_name "${TAG}" \
+      --target_commitish "${BUILD_REPO_SHA}" \
+      --body_string "${DESCRIPTION}" \
+      "${AMBER_NDK_INSTALL_DIR}.zip"
+
+    "${PYTHON}" -m github_release_retry.github_release_retry \
+      --user "${BUILD_REPO_ORG}" \
+      --repo "${BUILD_REPO_NAME}" \
+      --tag_name "${TAG}" \
+      --target_commitish "${BUILD_REPO_SHA}" \
+      --body_string "${DESCRIPTION}" \
+      "${AMBER_NDK_INSTALL_DIR}.zip.sha1"
+
+    "${PYTHON}" -m github_release_retry.github_release_retry \
+      --user "${BUILD_REPO_ORG}" \
+      --repo "${BUILD_REPO_NAME}" \
+      --tag_name "${TAG}" \
+      --target_commitish "${BUILD_REPO_SHA}" \
+      --body_string "${DESCRIPTION}" \
+      "${AMBER_APK_INSTALL_DIR}.zip"
+
+    "${PYTHON}" -m github_release_retry.github_release_retry \
+      --user "${BUILD_REPO_ORG}" \
+      --repo "${BUILD_REPO_NAME}" \
+      --tag_name "${TAG}" \
+      --target_commitish "${BUILD_REPO_SHA}" \
+      --body_string "${DESCRIPTION}" \
+      "${AMBER_APK_INSTALL_DIR}.zip.sha1"
+  fi
+  ;;
+
+*)
+  echo "Skipping Android release step."
+  ;;
+esac
+
 # Don't fail if pom cannot be uploaded, as it might already be there.
 
 "${PYTHON}" -m github_release_retry.github_release_retry \
