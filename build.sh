@@ -120,10 +120,53 @@ cmake --build . --config "${CMAKE_BUILD_TYPE}"
 #cmake "-DCMAKE_INSTALL_PREFIX=../${INSTALL_DIR}" "-DBUILD_TYPE=${CMAKE_BUILD_TYPE}" -P cmake_install.cmake
 popd
 
-# Do Android build when on Linux Debug.
+###### END BUILD ######
+
+###### START EDIT ######
+
+# Amber has no install targets, so manually copy amber binary and the Vulkan loader.
+
+mkdir -p "${INSTALL_DIR}/bin"
+mkdir -p "${INSTALL_DIR}/lib"
+
 case "$(uname)" in
 "Linux")
-  if test "${CONFIG}" = "Debug"; then
+  cp "${BUILD_DIR}/amber" "${INSTALL_DIR}/bin/"
+  cp "${BUILD_DIR}/third_party/vulkan-loader/loader/libvulkan."* "${INSTALL_DIR}/lib/"
+  ;;
+
+"Darwin")
+  cp "${BUILD_DIR}/amber" "${INSTALL_DIR}/bin/"
+  cp "${BUILD_DIR}/third_party/vulkan-loader/loader/libvulkan."* "${INSTALL_DIR}/lib/"
+  ;;
+
+"MINGW"*|"MSYS_NT"*)
+  cp "${BUILD_DIR}/amber.exe" "${INSTALL_DIR}/bin/"
+  cp "${BUILD_DIR}/amber.pdb" "${INSTALL_DIR}/bin/" || true
+  cp "${BUILD_DIR}/vulkan-1.dll" "${INSTALL_DIR}/lib/"
+  cp "${BUILD_DIR}/vulkan-1.pdb" "${INSTALL_DIR}/lib/" || true
+  ;;
+
+*)
+  echo "Unknown OS"
+  exit 1
+  ;;
+esac
+
+for f in "${INSTALL_DIR}/bin/"* "${INSTALL_DIR}/lib/"*; do
+  echo "${BUILD_REPO_SHA}">"${f}.build-version"
+  cp "${WORK}/COMMIT_ID" "${f}.version"
+done
+
+# Do the Android build and install steps when on Linux Release.
+case "$(uname)" in
+"Linux")
+  if test "${CONFIG}" = "Release"; then
+
+    # Delete Linux build to conserve disk space.
+    rm -rf "${BUILD_DIR}"
+
+    # Get Android tools.
 
     ANDROID_HOST_PLATFORM="linux"
 
@@ -191,77 +234,48 @@ case "$(uname)" in
       fi
     popd
 
+    # Android build step.
+
+    # This generates some files **in the Amber source tree**, which is necessary for Android builds.
+    # MUST BE DONE AFTER THE DESKTOP BUILD, OTHERWISE THE DESKTOP BUILD WILL FAIL.
     "${PYTHON}" tools/update_build_version.py . samples/ third_party/
     "${PYTHON}" tools/update_vk_wrappers.py . .
     mkdir -p "${AMBER_NDK_INSTALL_DIR}"
 
     pushd "${AMBER_NDK_INSTALL_DIR}"
-      # Build all ABIs.
-      "${ANDROID_NDK_HOME}/ndk-build" -C ../samples NDK_PROJECT_PATH=. "NDK_LIBS_OUT=$(pwd)/libs" "NDK_APP_OUT=$(pwd)/app" -j2 APP_ABI="arm64-v8a armeabi-v7a x86 x86_64"
+      # Build all ABIs separately; we don't need the `app/` directory, and it may cause us to run out of disk space.
+      "${ANDROID_NDK_HOME}/ndk-build" -C ../samples NDK_PROJECT_PATH=. "NDK_LIBS_OUT=$(pwd)/libs" "NDK_APP_OUT=$(pwd)/app" -j2 APP_ABI="arm64-v8a"
+      rm -rf "$(pwd)/app"
+      "${ANDROID_NDK_HOME}/ndk-build" -C ../samples NDK_PROJECT_PATH=. "NDK_LIBS_OUT=$(pwd)/libs" "NDK_APP_OUT=$(pwd)/app" -j2 APP_ABI="armeabi-v7a"
+      rm -rf "$(pwd)/app"
+      "${ANDROID_NDK_HOME}/ndk-build" -C ../samples NDK_PROJECT_PATH=. "NDK_LIBS_OUT=$(pwd)/libs" "NDK_APP_OUT=$(pwd)/app" -j2 APP_ABI="x86"
+      rm -rf "$(pwd)/app"
+      "${ANDROID_NDK_HOME}/ndk-build" -C ../samples NDK_PROJECT_PATH=. "NDK_LIBS_OUT=$(pwd)/libs" "NDK_APP_OUT=$(pwd)/app" -j2 APP_ABI="x86_64"
+      rm -rf "$(pwd)/app"
     popd
 
+    # Symlink to our built libs so they will be included in the APK.
     rm -rf "android_gradle/app/jniLibs"
     ln -s "$(pwd)/${AMBER_NDK_INSTALL_DIR}/libs" "android_gradle/app/jniLibs"
 
+    # Build the APK.
     mkdir -p "${AMBER_APK_INSTALL_DIR}"
     pushd "android_gradle"
       ./gradlew assembleDebug assembleDebugAndroidTest
     popd
     cp "android_gradle/app/build/outputs/apk/debug/app-debug.apk" "${AMBER_APK_INSTALL_DIR}/${AMBER_APK}"
     cp "android_gradle/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk" "${AMBER_APK_INSTALL_DIR}/${AMBER_TEST_APK}"
-  fi
-  ;;
 
-*)
-  echo "Skipping Android build."
-  ;;
-esac
+    # Remove the SDK and NDK to conserve disk space.
+    rm -rf "${ANDROID_HOME}"
+    rm -rf "${ANDROID_NDK_HOME}"
 
-###### END BUILD ######
+    # Android install step.
 
-###### START EDIT ######
-
-# Amber has no install targets, so manually copy amber binary and the Vulkan loader.
-
-mkdir -p "${INSTALL_DIR}/bin"
-mkdir -p "${INSTALL_DIR}/lib"
-
-case "$(uname)" in
-"Linux")
-  cp "${BUILD_DIR}/amber" "${INSTALL_DIR}/bin/"
-  cp "${BUILD_DIR}/third_party/vulkan-loader/loader/libvulkan."* "${INSTALL_DIR}/lib/"
-  ;;
-
-"Darwin")
-  cp "${BUILD_DIR}/amber" "${INSTALL_DIR}/bin/"
-  cp "${BUILD_DIR}/third_party/vulkan-loader/loader/libvulkan."* "${INSTALL_DIR}/lib/"
-  ;;
-
-"MINGW"*|"MSYS_NT"*)
-  cp "${BUILD_DIR}/amber.exe" "${INSTALL_DIR}/bin/"
-  cp "${BUILD_DIR}/amber.pdb" "${INSTALL_DIR}/bin/" || true
-  cp "${BUILD_DIR}/vulkan-1.dll" "${INSTALL_DIR}/lib/"
-  cp "${BUILD_DIR}/vulkan-1.pdb" "${INSTALL_DIR}/lib/" || true
-  ;;
-
-*)
-  echo "Unknown OS"
-  exit 1
-  ;;
-esac
-
-for f in "${INSTALL_DIR}/bin/"* "${INSTALL_DIR}/lib/"*; do
-  echo "${BUILD_REPO_SHA}">"${f}.build-version"
-  cp "${WORK}/COMMIT_ID" "${f}.version"
-done
-
-# Do the Android "install" step when on Linux Debug.
-case "$(uname)" in
-"Linux")
-  if test "${CONFIG}" = "Debug"; then
     # We just want the libs directory.
     # amber-1827383-android_ndk/app/local/{arm64-v8a, ...}/...
     # amber-1827383-android_ndk/libs/{arm64-v8a, ...}/amber_ndk
+    # The `app/` directory should have already been deleted, but just to be safe:
     rm -rf "${AMBER_NDK_INSTALL_DIR}/app"
     for f in "${AMBER_NDK_INSTALL_DIR}/libs/"*/*; do
       echo "${BUILD_REPO_SHA}">"${f}.build-version"
@@ -304,10 +318,10 @@ sha1sum "${POM_FILE}" >"${POM_FILE}.sha1"
 DESCRIPTION="$(echo -e "Automated build for ${TARGET_REPO_NAME} version ${COMMIT_ID}.\n$(git log --graph -n 3 --abbrev-commit --pretty='format:%h - %s <%an>')")"
 
 
-# Do the Android zip step when on Linux Debug.
+# Do the Android zip step when on Linux Release.
 case "$(uname)" in
 "Linux")
-  if test "${CONFIG}" = "Debug"; then
+  if test "${CONFIG}" = "Release"; then
     cp OPEN_SOURCE_LICENSES.TXT "${AMBER_NDK_INSTALL_DIR}/"
 
     pushd "${AMBER_NDK_INSTALL_DIR}"
@@ -359,10 +373,10 @@ export GITHUB_TOKEN="${GH_TOKEN}"
   --body_string "${DESCRIPTION}" \
   "${INSTALL_DIR}.zip.sha1"
 
-# Do the Android release step when on Linux Debug.
+# Do the Android release step when on Linux Release.
 case "$(uname)" in
 "Linux")
-  if test "${CONFIG}" = "Debug"; then
+  if test "${CONFIG}" = "Release"; then
 
     "${PYTHON}" -m github_release_retry.github_release_retry \
       --user "${BUILD_REPO_ORG}" \
