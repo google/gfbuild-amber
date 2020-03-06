@@ -120,10 +120,10 @@ cmake --build . --config "${CMAKE_BUILD_TYPE}"
 #cmake "-DCMAKE_INSTALL_PREFIX=../${INSTALL_DIR}" "-DBUILD_TYPE=${CMAKE_BUILD_TYPE}" -P cmake_install.cmake
 popd
 
-# Do Android build when on Linux Debug.
+# Do Android build when on Linux Release.
 case "$(uname)" in
 "Linux")
-  if test "${CONFIG}" = "Debug"; then
+  if test "${CONFIG}" = "Release"; then
 
     ANDROID_HOST_PLATFORM="linux"
 
@@ -196,8 +196,15 @@ case "$(uname)" in
     mkdir -p "${AMBER_NDK_INSTALL_DIR}"
 
     pushd "${AMBER_NDK_INSTALL_DIR}"
-      # Build all ABIs.
-      "${ANDROID_NDK_HOME}/ndk-build" -C ../samples NDK_PROJECT_PATH=. "NDK_LIBS_OUT=$(pwd)/libs" "NDK_APP_OUT=$(pwd)/app" -j2 APP_ABI="arm64-v8a armeabi-v7a x86 x86_64"
+      # Build all ABIs separately; we don't need the `app/` directory, and it may cause us to run out of disk space.
+      "${ANDROID_NDK_HOME}/ndk-build" -C ../samples NDK_PROJECT_PATH=. "NDK_LIBS_OUT=$(pwd)/libs" "NDK_APP_OUT=$(pwd)/app" -j2 APP_ABI="arm64-v8a"
+      rm -rf "$(pwd)/app"
+      "${ANDROID_NDK_HOME}/ndk-build" -C ../samples NDK_PROJECT_PATH=. "NDK_LIBS_OUT=$(pwd)/libs" "NDK_APP_OUT=$(pwd)/app" -j2 APP_ABI="armeabi-v7a"
+      rm -rf "$(pwd)/app"
+      "${ANDROID_NDK_HOME}/ndk-build" -C ../samples NDK_PROJECT_PATH=. "NDK_LIBS_OUT=$(pwd)/libs" "NDK_APP_OUT=$(pwd)/app" -j2 APP_ABI="x86"
+      rm -rf "$(pwd)/app"
+      "${ANDROID_NDK_HOME}/ndk-build" -C ../samples NDK_PROJECT_PATH=. "NDK_LIBS_OUT=$(pwd)/libs" "NDK_APP_OUT=$(pwd)/app" -j2 APP_ABI="x86_64"
+      rm -rf "$(pwd)/app"
     popd
 
     rm -rf "android_gradle/app/jniLibs"
@@ -209,6 +216,10 @@ case "$(uname)" in
     popd
     cp "android_gradle/app/build/outputs/apk/debug/app-debug.apk" "${AMBER_APK_INSTALL_DIR}/${AMBER_APK}"
     cp "android_gradle/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk" "${AMBER_APK_INSTALL_DIR}/${AMBER_TEST_APK}"
+
+    rm -rf "${ANDROID_NDK_HOME}"
+    rm -rf "${ANDROID_HOME}"
+
   fi
   ;;
 
@@ -255,10 +266,10 @@ for f in "${INSTALL_DIR}/bin/"* "${INSTALL_DIR}/lib/"*; do
   cp "${WORK}/COMMIT_ID" "${f}.version"
 done
 
-# Do the Android "install" step when on Linux Debug.
+# Do the Android "install" step when on Linux Release.
 case "$(uname)" in
 "Linux")
-  if test "${CONFIG}" = "Debug"; then
+  if test "${CONFIG}" = "Release"; then
     # We just want the libs directory.
     # amber-1827383-android_ndk/app/local/{arm64-v8a, ...}/...
     # amber-1827383-android_ndk/libs/{arm64-v8a, ...}/amber_ndk
@@ -304,10 +315,10 @@ sha1sum "${POM_FILE}" >"${POM_FILE}.sha1"
 DESCRIPTION="$(echo -e "Automated build for ${TARGET_REPO_NAME} version ${COMMIT_ID}.\n$(git log --graph -n 3 --abbrev-commit --pretty='format:%h - %s <%an>')")"
 
 
-# Do the Android zip step when on Linux Debug.
+# Do the Android zip step when on Linux Release.
 case "$(uname)" in
 "Linux")
-  if test "${CONFIG}" = "Debug"; then
+  if test "${CONFIG}" = "Release"; then
     cp OPEN_SOURCE_LICENSES.TXT "${AMBER_NDK_INSTALL_DIR}/"
 
     pushd "${AMBER_NDK_INSTALL_DIR}"
@@ -359,10 +370,10 @@ export GITHUB_TOKEN="${GH_TOKEN}"
   --body_string "${DESCRIPTION}" \
   "${INSTALL_DIR}.zip.sha1"
 
-# Do the Android release step when on Linux Debug.
+# Do the Android release step when on Linux Release.
 case "$(uname)" in
 "Linux")
-  if test "${CONFIG}" = "Debug"; then
+  if test "${CONFIG}" = "Release"; then
 
     "${PYTHON}" -m github_release_retry.github_release_retry \
       --user "${BUILD_REPO_ORG}" \
