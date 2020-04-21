@@ -32,6 +32,12 @@ case "$(uname)" in
   NINJA_OS="linux"
   BUILD_PLATFORM="Linux_x64"
   PYTHON="python3"
+  df -h
+  sudo swapoff -a
+  sudo rm -f /swapfile
+  sudo apt clean
+  docker rmi $(docker image ls -aq)
+  df -h
   ;;
 
 "Darwin")
@@ -166,6 +172,8 @@ case "$(uname)" in
     # Delete Linux build to conserve disk space.
     rm -rf "${BUILD_DIR}"
 
+    df -h
+
     # Get Android tools.
 
     ANDROID_HOST_PLATFORM="linux"
@@ -234,6 +242,8 @@ case "$(uname)" in
       fi
     popd
 
+    df -h
+
     # Android build step.
 
     # This generates some files **in the Amber source tree**, which is necessary for Android builds.
@@ -245,13 +255,21 @@ case "$(uname)" in
     pushd "${AMBER_NDK_INSTALL_DIR}"
       # Build all ABIs separately; we don't need the `app/` directory, and it may cause us to run out of disk space.
       "${ANDROID_NDK_HOME}/ndk-build" -C ../samples NDK_PROJECT_PATH=. "NDK_LIBS_OUT=$(pwd)/libs" "NDK_APP_OUT=$(pwd)/app" -j2 APP_ABI="arm64-v8a"
+      df -h
       rm -rf "$(pwd)/app"
+      df -h
       "${ANDROID_NDK_HOME}/ndk-build" -C ../samples NDK_PROJECT_PATH=. "NDK_LIBS_OUT=$(pwd)/libs" "NDK_APP_OUT=$(pwd)/app" -j2 APP_ABI="armeabi-v7a"
+      df -h
       rm -rf "$(pwd)/app"
+      df -h
       "${ANDROID_NDK_HOME}/ndk-build" -C ../samples NDK_PROJECT_PATH=. "NDK_LIBS_OUT=$(pwd)/libs" "NDK_APP_OUT=$(pwd)/app" -j2 APP_ABI="x86"
+      df -h
       rm -rf "$(pwd)/app"
+      df -h
       "${ANDROID_NDK_HOME}/ndk-build" -C ../samples NDK_PROJECT_PATH=. "NDK_LIBS_OUT=$(pwd)/libs" "NDK_APP_OUT=$(pwd)/app" -j2 APP_ABI="x86_64"
+      df -h
       rm -rf "$(pwd)/app"
+      df -h
     popd
 
     # Symlink to our built libs so they will be included in the APK.
