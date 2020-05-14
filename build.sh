@@ -226,9 +226,9 @@ case "$(uname)" in
     pushd "${HOME}"
       echo "Installing Android NDK ${ANDROID_HOST_PLATFORM} (linux, darwin, or windows) ..."
 
-      ANDROID_NDK_FILENAME="android-ndk-r20-${ANDROID_HOST_PLATFORM}-x86_64.zip"
+      ANDROID_NDK_FILENAME="android-ndk-r21-${ANDROID_HOST_PLATFORM}-x86_64.zip"
 
-      ANDROID_NDK_HOME="$(pwd)/android-ndk-r20"
+      ANDROID_NDK_HOME="$(pwd)/android-ndk-r21"
       export ANDROID_NDK_HOME
 
       echo "... to ${ANDROID_NDK_HOME}"
