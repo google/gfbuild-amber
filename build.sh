@@ -32,12 +32,14 @@ case "$(uname)" in
   NINJA_OS="linux"
   BUILD_PLATFORM="Linux_x64"
   PYTHON="python3"
+
   df -h
-  sudo swapoff -a
-  sudo rm -f /swapfile
   sudo apt clean
-  docker rmi $(docker image ls -aq)
+  # shellcheck disable=SC2046
+  docker rmi -f $(docker image ls -aq)
+  sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/hostedtoolcache/boost /opt/ghc
   df -h
+
   ;;
 
 "Darwin")
